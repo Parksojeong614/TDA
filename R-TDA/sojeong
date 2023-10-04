@@ -1,0 +1,24 @@
+library("tidyverse")
+library("ggplot2")
+library('dplyr')
+library('stringr')
+
+
+seo_2022<-read.csv(file = "C:/Users/psj00/Downloads/202212_202212_주민등록인구및세대현황_연간.csv")
+seo_2022 <- seo_2022[-1,]
+
+##tidy
+
+seo_2022 %>% 
+  mutate(sido = sapply(str_split(seo_2022$행정구역,' '),'[',1)) %>% 
+  mutate(gu = sapply(str_split(seo_2022$행정구역,' '),'[',3)) %>% 
+  mutate(id = sapply(str_split(seo_2022$행정구역,' '),'[',4)) -> seo_2022
+
+seo_2022 <- seo_2022[-1]
+
+seo_2022 %>% 
+  mutate(year = 2022) -> seo_2022
+
+colnames(seo_2022) = c("2022년_총인구수","세대수",
+                       "세대당인구", "남자인구수", "여자인구수",
+                       "남여비율","sido","gu","id", "year")
