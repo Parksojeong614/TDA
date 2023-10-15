@@ -1,0 +1,126 @@
+---
+title: "tda_1"
+author: "park so jeong 202011514"
+date: '2023 10 5 '
+output: html_document
+---
+```{r}
+##install.packages("ggcorrplot")
+##install.packages("ggrepel")
+library("tidyverse")
+library("ggplot2")
+library('dplyr')
+library('stringr')
+library("ggcorrplot")
+library("ggrepel")
+
+
+
+seo_2022<-read.csv(file = "C:/Users/psj00/Downloads/202212_202212_주민등록인구및세대현황_연간.csv")
+seo_2022 <- seo_2022[-1,]
+
+##tidy
+
+seo_2022 %>% 
+  mutate(sido = sapply(str_split(seo_2022$행정구역,' '),'[',1)) %>% 
+  mutate(gu = sapply(str_split(seo_2022$행정구역,' '),'[',3)) %>% 
+  mutate(id = sapply(str_split(seo_2022$행정구역,' '),'[',4)) -> seo_2022
+
+seo_2022 <- seo_2022[-1]
+
+seo_2022 %>% 
+  mutate(year = 2022) -> seo_2022
+
+colnames(seo_2022) = c("총인구수","세대수",
+                       "세대당인구", "남자인구수", "여자인구수",
+                       "남여비율","sido","gu","id", "year")
+
+seo_2022 <- seo_2022 %>%
+  mutate(총인구수 = as.numeric(gsub(",", "", 총인구수))) %>% 
+  mutate(세대수 = as.numeric(gsub(",", "", 세대수))) %>%
+  mutate(세대당인구 = as.numeric(gsub(",", "", 세대당인구))) %>% 
+  mutate(남자인구수 = as.numeric(gsub(",", "", 남자인구수))) %>% 
+  mutate(여자인구수 = as.numeric(gsub(",", "", 여자인구수))) %>% 
+  mutate(남여비율 = as.numeric(gsub(",", "", 남여비율)))
+
+
+```
+# density plot
+```{r}
+# 서울의 인구 밀도는 매우 높아서 구마다 큰 차이를 보이지 않을 것이라 생각하였으나 구마다 차이가 있을 것임
+seo_2022 %>%ggplot(aes(x =총인구수 )) +
+  geom_density()
+```
+```{r}
+seo_2022 %>%ggplot(aes(x =세대수 )) +
+  geom_density()
+```
+```{r}
+seo_2022 %>%ggplot(aes(x =세대당인구 )) +
+  geom_density()
+```
+## heat map
+```{r}
+# 상관계수_heatmap
+
+## 여자인구수나 남자인구 수 둘다 전체인구수완 상관관계가 높음,
+## 특정성별이 전체인구수에 영향을 주는 것같지는 않음 
+seo_2022 %>% 
+  select("총인구수","세대수", "세대당인구",
+         "남자인구수","여자인구수", "남여비율") -> seo22_corr
+
+cor_matrix <- cor(seo22_corr)
+ggcorrplot(cor_matrix)
+
+```
+## 산점도
+```{r}
+# 총인구 수와 세대수가 높은 구 확인(scatter plot)
+
+## ggrepel library 재설치 후 다시그리기
+## 총인구수와 세대수가 높은 송파구, 강남구, 노원구는 교육열이 높은 곳으로 알려져 있는 구임 -> 자녀를 둔 가정들이 많다고 생각함
+## 강남구과 송파구는 사업체 수도 많음
+## (거주인구수 많음 + 사업체 수 작음), (거주인구수 많음 + 사업체 수 많음) 이런식으로 사업체 수 데이터가 있다면 지역별 특징을 확인할 수 있을 것임
+## 강서구의 경우 공항근처라 거주인구수가 많을 것임
+
+seo_2022 %>% ggplot( aes(x = 총인구수, y = 세대수)) +
+  geom_point() +
+  geom_text(aes(label = gu), vjust = 1 ,size = 3)
+
+```
+
+
+```{r}
+## 총인구수, 세대당 인구 산점도
+seo_2022 %>% ggplot( aes(x = 총인구수, y = 세대당인구)) +
+  geom_point() +
+  geom_text(aes(label = gu), vjust = 1)
+
+# 총인구 수가 많으나 세대당 인구수가 작다면 1인가구가 많은 지역이라고 생각되어짐(관악구)
+# 총인구수도 높고 세대수도 높음 - 송파구, 핵가족 형태가 많음
+# 추가적으로 두변수를 사용해서 군집화를 통해 지역별로 묶어보기로함
+```
+
+```{r}
+## 총인구수, 세대당 인구 k-means
+selected_data <- seo_2022 %>% select(총인구수, 세대당인구)
+
+# elbow plot
+sse <- c()
+for (k in 1:10) {
+  kmeans_result <- kmeans(selected_data, centers = k)
+  sse[k] <- kmeans_result$tot.withinss
+}
+plot(1:10, sse, type = "b", xlab = "Number of Clusters (K)", ylab ="SSE")
+kmeans_result <- kmeans(selected_data, centers = 3 )
+clustered_data <- selected_data %>% mutate(cluster = kmeans_result$cluster)
+
+# 시각화
+ggplot(clustered_data, aes(x = 총인구수, y = 세대당인구, color = factor(cluster))) +
+  geom_point() +
+  geom_text(aes(label = seo_2022$gu), hjust = 1, vjust = 1)
+
+
+# 세대당인구수가 작으면서 총인구수도 작음 -> 1인가구 많음
+# 세대당 인구수가 높고 총인구수도 높음 -> 자녀를 둔 가정이 많음
+```
